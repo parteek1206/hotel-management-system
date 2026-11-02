@@ -558,7 +558,7 @@ export async function getCancelledReservationReport({
         'Cancellation requested by administrator / guest'
       ) AS cancellation_reason,
       COALESCE(
-        (SELECT DATE_FORMAT(changed_at, '%Y-%m-%d %H:%i') FROM reservation_status_history 
+        (SELECT DATE_FORMAT(change_timestamp, '%Y-%m-%d %H:%i') FROM reservation_status_history 
          WHERE reservation_id = res.id AND new_status = 'cancelled' 
          ORDER BY id DESC LIMIT 1),
         DATE_FORMAT(res.updated_at, '%Y-%m-%d %H:%i')

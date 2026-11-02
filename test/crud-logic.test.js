@@ -15,6 +15,7 @@ import {
 } from '../src/services/billingService.js';
 import * as dashboardService from '../src/services/dashboardService.js';
 import * as reportService from '../src/services/reportService.js';
+import { pool } from '../src/config/db.js';
 
 // =============================================================================
 // TEST SUITE 1: CUSTOMER VALIDATION LOGIC
@@ -506,6 +507,12 @@ test('Phase 7 Route Architecture - Verifies Executive Dashboard and All 7 Report
   const server = app.listen(0);
   const port = server.address().port;
   const authHeaders = { 'x-test-bypass-auth': 'true' };
+
+  t.after(async () => {
+    try {
+      await pool.end();
+    } catch (e) {}
+  });
 
   try {
     // 1. Test GET / (Admin Dashboard)

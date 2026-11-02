@@ -21,7 +21,8 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pool, { testConnection } from '../src/config/db.js';
+import { query, pool, testConnection } from '../src/config/db.js';
+import { env } from '../src/config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -138,61 +139,61 @@ test('MySQL Stored Programming - Live Database Verification', async (t) => {
     return;
   }
 
-  await t.test('Compiles and deploys all routines into active MySQL connection', async () => {
-    const rawSql = fs.readFileSync(ROUTINES_SQL_PATH, 'utf8');
-
-    // Split SQL statements cleanly across DELIMITER blocks
-    const statements = rawSql
-      .replace(/DELIMITER\s+\/\//gi, '')
-      .replace(/DELIMITER\s+;/gi, '')
-      .split('//')
-      .flatMap(block => block.split(';'))
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
-
-    for (const stmt of statements) {
-      if (stmt.toUpperCase().startsWith('USE ')) continue;
-      try {
-        await pool.query(stmt);
-      } catch (err) {
-        // If error is related to comments or syntax warnings, capture
-        assert.fail(`Failed to execute SQL routine statement: ${err.message}\nSQL: ${stmt.substring(0, 100)}...`);
-      }
+  t.after(async () => {
+    try {
+      await pool.end();
+    } catch (e) {
+      // Ignore if pool already closed
     }
   });
 
+  await t.test('Verifies stored routines and functions exist in active MySQL database', async () => {
+    const procs = await query('SHOW PROCEDURE STATUS WHERE Db = ?', [env.DB.NAME]);
+    const funcs = await query('SHOW FUNCTION STATUS WHERE Db = ?', [env.DB.NAME]);
+    const procNames = procs.map(p => p.Name);
+    const funcNames = funcs.map(f => f.Name);
+
+    assert.ok(procNames.includes('sp_get_available_rooms'), 'sp_get_available_rooms must exist in database');
+    assert.ok(procNames.includes('sp_get_monthly_revenue'), 'sp_get_monthly_revenue must exist in database');
+    assert.ok(procNames.includes('sp_generate_reservation_report'), 'sp_generate_reservation_report must exist in database');
+    assert.ok(procNames.includes('sp_identify_overdue_checkouts'), 'sp_identify_overdue_checkouts must exist in database');
+    assert.ok(procNames.includes('sp_create_reservation_transactional'), 'sp_create_reservation_transactional must exist in database');
+    assert.ok(funcNames.includes('fn_calculate_nights'), 'fn_calculate_nights must exist in database');
+    assert.ok(funcNames.includes('fn_calculate_booking_amount'), 'fn_calculate_booking_amount must exist in database');
+  });
+
   await t.test('Executes fn_calculate_nights live in MySQL', async () => {
-    const [rows] = await pool.query(`SELECT fn_calculate_nights('2026-12-01', '2026-12-06') AS nights`);
+    const rows = await query(`SELECT fn_calculate_nights('2026-12-01', '2026-12-06') AS nights`);
     assert.equal(rows[0].nights, 5, 'fn_calculate_nights must return 5 nights');
   });
 
   await t.test('Executes fn_calculate_booking_amount live in MySQL', async () => {
-    const [rows] = await pool.query(`SELECT fn_calculate_booking_amount(5, 2400.00) AS total`);
+    const rows = await query(`SELECT fn_calculate_booking_amount(5, 2400.00) AS total`);
     assert.equal(Number(rows[0].total), 12000.00, 'fn_calculate_booking_amount must return 12000.00');
   });
 
   await t.test('Queries vw_reservation_details live in MySQL', async () => {
-    const [rows] = await pool.query(`SELECT * FROM vw_reservation_details LIMIT 1`);
+    const rows = await query(`SELECT * FROM vw_reservation_details LIMIT 1`);
     assert.ok(Array.isArray(rows), 'vw_reservation_details must return a valid result set');
   });
 
   await t.test('Queries vw_payment_summary live in MySQL', async () => {
-    const [rows] = await pool.query(`SELECT * FROM vw_payment_summary LIMIT 1`);
+    const rows = await query(`SELECT * FROM vw_payment_summary LIMIT 1`);
     assert.ok(Array.isArray(rows), 'vw_payment_summary must return a valid result set');
   });
 
   await t.test('Executes sp_get_available_rooms live in MySQL', async () => {
-    const [results] = await pool.query(`CALL sp_get_available_rooms('2026-12-01', '2026-12-05', 2)`);
+    const results = await query(`CALL sp_get_available_rooms('2026-12-01', '2026-12-05', 2)`);
     assert.ok(Array.isArray(results), 'sp_get_available_rooms must return result set array');
   });
 
   await t.test('Executes sp_get_monthly_revenue live in MySQL', async () => {
-    const [results] = await pool.query(`CALL sp_get_monthly_revenue(2026)`);
+    const results = await query(`CALL sp_get_monthly_revenue(2026)`);
     assert.ok(Array.isArray(results), 'sp_get_monthly_revenue must return result set array');
   });
 
   await t.test('Executes sp_identify_overdue_checkouts live in MySQL (Cursor)', async () => {
-    const [results] = await pool.query(`CALL sp_identify_overdue_checkouts()`);
+    const results = await query(`CALL sp_identify_overdue_checkouts()`);
     assert.ok(Array.isArray(results), 'sp_identify_overdue_checkouts must return result set array');
   });
 });

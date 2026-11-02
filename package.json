@@ -9,7 +9,8 @@
     "dev": "nodemon src/server.js",
     "test": "node --test test/*.test.js",
     "test:e2e": "node test/e2e-db-crud.js",
-    "seed:admin": "node database/seed-admin.js"
+    "seed:admin": "node database/seed-admin.js",
+    "admin:reset-password": "node database/reset-admin-password.js"
   },
   "keywords": [
     "hotel-management",

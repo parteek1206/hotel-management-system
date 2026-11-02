@@ -21,6 +21,8 @@ import assert from 'node:assert/strict';
 import app from '../src/app.js';
 import authService, { hashPassword, comparePassword, validateLoginInput } from '../src/services/authService.js';
 import { env } from '../src/config/env.js';
+import { pool } from '../src/config/db.js';
+import { resetAdminPassword } from '../database/reset-admin-password.js';
 
 // =============================================================================
 // SUITE 1: PASSWORD HASHING & BCRYPT VERIFICATION
@@ -311,4 +313,54 @@ test('Phase 9 Security - HTTP Authentication & Route Protection', async (t) => {
   } finally {
     server.close();
   }
+});
+
+// =============================================================================
+// SUITE 4: SECURE ADMINISTRATOR PASSWORD RESET UTILITY
+// =============================================================================
+test('Phase 9 Security - Administrator Password Reset Mechanism', async (t) => {
+  t.after(async () => {
+    try {
+      await pool.end();
+    } catch (_) {}
+  });
+
+  await t.test('Rejects password reset with empty or invalid identifier', async () => {
+    await assert.rejects(
+      async () => await resetAdminPassword('', 'NewPass@2026'),
+      /username or email is required/,
+      'Must reject empty username'
+    );
+  });
+
+  await t.test('Rejects password reset with password shorter than 6 characters', async () => {
+    await assert.rejects(
+      async () => await resetAdminPassword('admin', '123'),
+      /at least 6 characters/,
+      'Must reject short password'
+    );
+  });
+
+  await t.test('Rejects password reset for non-existent administrator account', async () => {
+    await assert.rejects(
+      async () => await resetAdminPassword('non_existent_user_999@test.com', 'ValidPass@2026'),
+      /was not found/,
+      'Must reject non-existent account'
+    );
+  });
+
+  await t.test('Successfully resets administrator password and enables authentication', async () => {
+    // 1. Reset password for 'admin'
+    const updated = await resetAdminPassword('admin', 'Admin@12345');
+    assert.equal(updated.username, 'admin');
+
+    // 2. Verify login succeeds with the reset password
+    const authOk = await authService.authenticate('admin', 'Admin@12345');
+    assert.equal(authOk.success, true, 'Authentication must succeed with new password');
+    assert.equal(authOk.user.username, 'admin');
+
+    // 3. Verify login fails with wrong password
+    const authBad = await authService.authenticate('admin', 'WrongPassword123');
+    assert.equal(authBad.success, false, 'Authentication must fail with incorrect password');
+  });
 });

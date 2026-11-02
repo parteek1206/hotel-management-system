@@ -206,9 +206,17 @@ async function runE2ECrudTests() {
       console.log(`✔ 8. Relational Integrity: Prevented deletion of customer with booking records: "${constraintErr.message}"`);
     }
 
-    // Cleanup test records
-    await reservationService.cancelReservation(booking.reservationId, 'Test teardown');
-    console.log(`✔ 7. Cancellation: Successfully cancelled reservation and released room dates\n`);
+    // 9. Cancellation Testing on an Active Booking
+    const cancelTestBooking = await reservationService.createReservation({
+      customerId: createdCustomerId,
+      roomId: createdRoomId,
+      checkInDate: '2026-12-01',
+      checkOutDate: '2026-12-05',
+      guestsCount: 1,
+      status: 'confirmed'
+    });
+    await reservationService.cancelReservation(cancelTestBooking.reservationId, 'Test teardown cancellation');
+    console.log(`✔ 9. Cancellation: Successfully cancelled reservation #${cancelTestBooking.reservationId} and released room dates\n`);
 
     // -------------------------------------------------------------------------
     // MODULE 5: DASHBOARD & REPORTING AGGREGATE ENGINE (PHASE 7)
