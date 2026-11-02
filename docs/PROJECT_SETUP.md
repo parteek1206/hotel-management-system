@@ -1,7 +1,7 @@
 # Hotel Reservation & Management System (HRMS) — Installation & Setup Guide
 
 > **Academic Project:** Master of Computer Applications (MCA) Final Year Project  
-> **Repository:** `https://github.com/anish-kumar03/HOTEL-MANAGEMENT-APP.git`
+> **Repository:** "https://github.com/parteek1206/hotel-management-system"
 
 ---
 
